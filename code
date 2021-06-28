@@ -1,0 +1,1308 @@
+Листинг программы:
+# include <limits.h>
+#include <iostream>
+#include <string>
+#include <iomanip>
+#include <Windows.h>
+#include <cctype>
+#include <random>
+#include <ctime>
+#include <fstream>
+#include <vector>
+#include <list>
+#pragma warning(disable:4996)
+
+using namespace std;
+const int TABLE_SIZE = 5;
+
+struct client
+{
+	string passport;
+	string obtaining;
+	string FIO;
+	unsigned short year_of_birth;
+	string address;
+};
+struct Node
+{
+	client information;
+	int elem;
+	int height; // высота дерева
+	Node* left; //указатели на потомков
+	Node* right;
+	//конструктор для создания нового узла дерева
+	Node(client data, int el) { information = data; elem = el; left = right = 0; height = 1; }
+};
+
+struct sim // генерация ключа 
+{
+	string sim_number;
+	string tariff;
+	unsigned short year_of_issue;
+	bool presence;
+};
+
+//функции для работы с высотой
+
+//обертка для height
+//получаем высоту вершины
+int height(Node* p)
+{
+	if (p != NULL)
+		return p->height;
+	else
+		return 0;
+}
+
+//вычисляем balance factor узла
+int balance_factor(Node* p)
+{
+	return height(p->right) - height(p->left);
+}
+
+//восстанавливаем корректное значение поля height заданного узла, при нарушении балансировки
+void fix_height(Node* p)
+{
+	int hr = height(p->right);
+	int hl = height(p->left);
+	if (hl > hr)
+		p->height = hl + 1;
+	else
+		p->height = hr + 1;
+}
+
+//правый поворот вокруг p
+Node* rotate_right(Node* p)
+{
+	Node* q = p->left;
+	p->left = q->right;
+	q->right = p;
+	fix_height(p);
+	fix_height(q);
+	return q;
+}
+
+//левый поворот вокруг q
+Node* rotate_left(Node* q)
+{
+	Node* p = q->right;
+	q->right = p->left;
+	p->left = q;
+	fix_height(q);
+	fix_height(p);
+	return p;
+}
+
+//балансировка узла p
+Node* balance(Node* p)
+{
+	fix_height(p);
+	if (balance_factor(p) == 2)
+	{
+		if (balance_factor(p->right) < 0)
+			p->right = rotate_right(p->right);
+		return rotate_left(p);
+	}
+	if (balance_factor(p) == -2)
+	{
+		if (balance_factor(p->left) > 0)
+			p->left = rotate_right(p->left);
+		return rotate_right(p);
+	}
+	return p; //балансировка не нужна
+}
+
+//функция добавления клиента
+Node* add_client(Node* p, client k, int res)
+{
+	if (!p)
+		return new Node(k, res);
+	if (res < p->elem)
+		p->left = add_client(p->left, k, res);
+	else
+		p->right = add_client(p->right, k, res);
+	return balance(p);
+}
+
+//функция проверки на наличие введенного клиента
+void check_client(Node* p, client k, bool& found)
+{
+	if (p == NULL)
+		return;
+	if (p->information.passport == k.passport)
+	{
+		found = true;
+		return;
+	}
+	else
+	{
+		if (p->information.address == k.address)
+		{
+			found = true;
+			return;
+		}
+	}
+	if (k.passport > p->information.passport)
+		check_client(p->right, k, found);
+	else
+		check_client(p->left, k, found);
+}
+
+// функция поиска клиента по паспорту
+void search_client(Node* p, client k, bool& found)
+{
+	if (p != NULL) {
+		if (p->information.passport == k.passport)
+		{
+			cout << setw(2) << "|" << p->information.FIO << setw(2) << "|" << p->information.passport << setw(2) << "|" << p->information.obtaining
+				<< setw(2) << "|" << p->information.year_of_birth << setw(2) << "|" << p->information.address << setw(2) << "|" << endl;
+		}
+		else
+		{
+			if (p->information.address == k.address)
+			{
+				cout << setw(2) << "|" << p->information.FIO << setw(2) << "|" << p->information.passport << setw(2) << "|" << p->information.obtaining
+					<< setw(2) << "|" << p->information.year_of_birth << setw(2) << "|" << p->information.address << setw(2) << "|" << endl;
+			}
+		}
+		if (k.passport > p->information.passport)
+			check_client(p->right, k, found);
+		else
+			check_client(p->left, k, found);
+	}
+}
+
+// функция поиска клиента по части ФИО
+void search_client_by_fio(Node* p, string fio_part)
+{
+	if (p == NULL)
+		return;
+
+	for (int i = 0; i < p->information.FIO.size(); i++)
+	{
+		if (p->information.FIO[i] == fio_part[0])
+		{
+			int step = 0;
+			for (int j = 0; j < fio_part.size(); j++)
+			{
+				if (p->information.FIO[i + j] == fio_part[j]) {
+					step += 1;
+				}
+			}
+			if (step == fio_part.size()) {
+				cout << setw(2) << "|" << p->information.FIO << setw(2) << "|" << p->information.passport << setw(2)
+					<< "|" << p->information.address << setw(2) << "|" << endl;
+			}
+		}
+	}
+	search_client_by_fio(p->left, fio_part);
+	search_client_by_fio(p->right, fio_part);
+
+}
+
+// функция вывода дерева
+void print_tree(Node* p, int level)
+{
+	if (p)
+	{
+		print_tree(p->right, level + 1);
+		for (int i = 0; i < level; i++)
+			cout << " ";
+		cout << p->elem << endl;
+		print_tree(p->left, level + 1);
+	}
+}
+
+// вывод информации обо всех клиентах прямым обходом
+void print_information(Node* p)
+{
+	if (p)
+	{
+		cout << "|";
+		for (int i = 0; i < p->information.FIO.size(); i++)
+		{
+			if (p->information.FIO[i] == 95)
+			{
+				cout << " ";
+				continue;
+			}
+			cout << p->information.FIO[i];
+		}
+		cout << setw(2) << "|" << setw(2) << p->information.passport << setw(2) << "|" << setw(2);
+		for (int i = 0; i < p->information.obtaining.size(); i++)
+		{
+			if (p->information.obtaining[i] == 45)
+			{
+				cout << " ";
+				continue;
+			}
+			if (p->information.obtaining[i] == 95)
+			{
+				cout << setw(2) << "|" << setw(2);
+				for (int j = i + 1; j < p->information.obtaining.size(); j++)
+				{
+					cout << p->information.obtaining[j];
+				}
+				cout << setw(2) << "|" << setw(2);
+				break;
+			}
+			cout << p->information.obtaining[i];
+		}
+		cout << p->information.year_of_birth << setw(2) << "|" << setw(2);
+		for (int i = 0; i < p->information.address.size(); i++)
+		{
+			if (p->information.address[i] == 95)
+			{
+				cout << " ";
+				continue;
+			}
+			cout << p->information.address[i];
+		}
+		cout << setw(2) << "|" << endl;
+		print_information(p->left);
+		print_information(p->right);
+	}
+}
+
+
+// функция проверки паспортных данных 
+bool check_passport(string passport)
+{
+	if (passport.size() != 11)
+		return false;
+	for (int i = 0; i < passport.size(); i++)
+	{
+		if (i == 4)
+		{
+			if (passport[i] != 45)
+				return false;
+			else
+				continue;
+		}
+		if (passport[i] < 48 || passport[i] > 57)
+			return false;
+	}
+	return true;
+}
+
+// функция проверки места и даты выдачи паспорта
+bool check_obtaining(string obtaining)
+{
+	if ((obtaining[0] >= 32 && obtaining[0] <= 127) || (obtaining[0] >= 160 && obtaining[0] <= 255) || (obtaining[0] >= 'а' &&
+		obtaining[0] <= 'я'))
+		return false;
+	int i = 1;
+	while (obtaining[i] != '\0')
+	{
+		if ((obtaining[i + 1] >= 48 && obtaining[i + 1] <= 57 && obtaining[i] == 95))
+		{
+			i++;
+			string obt = obtaining;
+			obt.erase(0, i);
+			if (obt.size() != 10)
+				return false;
+			for (int j = 0; j < obt.size(); j++)
+			{
+				if (j == 2 || j == 5)
+				{
+					if (obt[j] != 46)
+						return false;
+				}
+				else
+				{
+					if (obt[j] < 48 || obt[j]>57)
+						return false;
+				}
+			}
+			break;
+		}
+		else
+		{
+			if ((obtaining[i] >= 32 && obtaining[i] <= 44) || (obtaining[i] >= 46 && obtaining[i] <= 127) || (obtaining[i] >= 160 && obtaining[i] <= 255) || (obtaining[i] >= 'а' &&
+				obtaining[i] <= 'я'))
+				return false;
+			if (obtaining[i + 1] == '\0')
+				return false;
+		}
+		i++;
+	}
+	return true;
+}
+
+// функция проверки ФИО клиента
+bool check_FIO(string FIO)
+{
+	int count = 0;
+	if ((FIO[0] >= 32 && FIO[0] <= 127) || (FIO[0] >= 160 && FIO[0] <= 255) || (FIO[0] >= 'а' &&
+		FIO[0] <= 'я'))
+		return false;
+	for (int i = 1; i < FIO.size(); i++)
+	{
+		if (FIO[i] == 95)
+		{
+			if ((FIO[i + 1] >= 32 && FIO[i + 1] <= 127) || (FIO[i + 1] >= 160 && FIO[i + 1] <= 255) || (FIO[i + 1] >= 'а' &&
+				FIO[i + 1] <= 'я'))
+				return false;
+			count++;
+			i++;
+		}
+		else
+		{
+			if ((FIO[i] >= 32 && FIO[i] <= 160) || (FIO[i] >= 'А' && FIO[i] <= 'Я'))
+				return false;
+		}
+	}
+	if (count != 2)
+		return false;
+	return true;
+}
+
+// функция проверки года рождения
+bool check_year_of_birth(unsigned short year)
+{
+	if (year < 1900 || year > 2007)
+		return false;
+	return true;
+}
+
+// функция проверки адреса
+bool check_address(string address)
+{
+	int count = 0;
+	if ((address[0] >= 33 && address[0] <= 127) || (address[0] >= 160 && address[0] <= 255) || (address[0] >= 'а' &&
+		address[0] <= 'я'))
+		return false;
+	for (int i = 1; i < address.size(); i++)
+	{
+		if (address[i] == 95 && (address[i + 1] < 49 || address[i + 1]>57))
+		{
+			if ((address[i + 1] >= 33 && address[i + 1] <= 127) || (address[i + 1] >= 160 && address[i + 1] <= 255) || (address[i + 1] >= 'а' &&
+				address[i + 1] <= 'я'))
+				return false;
+			i += 2;
+			while (address[i] != 95)
+			{
+				if ((address[i] >= 33 && address[i] <= 160) || (address[i] >= 'А' && address[i] <= 'Я'))
+					return false;
+				i++;
+			}
+			i--;
+			count++;
+		}
+		else if (address[i] == 95 && (address[i + 1] >= 49 && address[i + 1] <= 57))
+		{
+			i++;
+			while (address[i] != 95)
+			{
+				if (address[i] < 48 || address[i]>57)
+					return false;
+				i++;
+				if (address[i] == '\0')
+					break;
+			}
+			i--;
+			count++;
+		}
+		else
+		{
+			if ((address[i] >= 33 && address[i] <= 160) || (address[i] >= 'А' && address[i] <= 'Я'))
+				return false;
+		}
+		if (address[i + 1] == '\0' && (count < 2 || count > 3))
+			return false;
+	}
+	return true;
+}
+
+// функция проверки введенной информации
+void check_information(client& k)
+{
+	cout << "Введите ФИО клиента ('Фамилия'_'Имя'_'Отчество'): ";
+	while (1)
+	{
+		cin >> k.FIO;
+		if (check_FIO(k.FIO))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "ФИО клиента введены некорректно. Повторите ввод: ";
+		}
+	}
+	cout << "Введите паспортные данные клиента (NNNN-NNNNNN, где N это цифра): ";
+	while (1)
+	{
+		cin >> k.passport;
+		if (check_passport(k.passport))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Паспортные данные введены неккоректно. Повторите ввод: ";
+		}
+	}
+	cout << "Введите место и дату выдачи паспорта ('МЕСТОВЫДАЧИ'_'дата выдачи'): ";
+	while (1)
+	{
+		cin >> k.obtaining;
+		if (check_obtaining(k.obtaining))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Данные о клиенте введены некорректно. Повторите ввод: ";
+		}
+	}
+	cout << "Введите год рождения клиента (число от 1900 до 2007): ";
+	while (1)
+	{
+		cin >> k.year_of_birth;
+		if (check_year_of_birth(k.year_of_birth))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Год рождения введен некорректно. Повторите ввод: ";
+		}
+	}
+	cout << "Введите адрес клиента ('Город'_'Улица'_'номер дома'_'номер квартиры'): ";
+	while (1)
+	{
+		cin >> k.address;
+		if (check_address(k.address))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Адрес введен некорректно. Повторите ввод: ";
+		}
+	}
+}
+
+// поиск узла с минимальным значением в дереве 
+Node* findMin(Node* p)
+{
+	return p->left ? findMin(p->left) : p;
+}
+
+// удаление узла с минимальным значением из дерева
+Node* deleteMin(Node* p)
+{
+	if (p->left == 0)
+		return p->right;
+	p->left = deleteMin(p->left);
+	return balance(p);
+}
+
+// удаление значения из дерева p
+Node* deleteElem(Node* p, int value)
+{
+	if (!p) return 0;
+	if (value < p->elem)
+		p->left = deleteElem(p->left, value);
+	else if (value > p->elem)
+		p->right = deleteElem(p->right, value);
+	else //value == p->elem 
+	{
+		Node* q = p->left;
+		Node* k = p->right;
+		delete p;
+		if (!k) return q;
+		Node* min = findMin(k);
+		min->right = deleteMin(k);
+		min->left = q;
+		return balance(min);
+	}
+	return balance(p);
+}
+
+
+//........................................ 2 часть................................................//
+
+
+
+bool check_sim(string sim) // функция проверки номера sim-карты
+{
+	if (sim.size() != 11)
+		return false;
+	for (int i = 0; i < sim.size(); i++)
+	{
+		if (i == 3)
+		{
+			if (sim[i] != 45)
+				return false;
+			else
+				continue;
+		}
+		if (sim[i] < 48 || sim[i] > 57)
+			return false;
+	}
+	return true;
+}
+
+bool check_year_of_issue(unsigned short years) // функция проверки года выдачи sim-карты
+{
+	if (years < 2000 || years > 2021)
+		return false;
+	return true;
+}
+
+bool check_tariff(string tariff) // функция проверки тарифа
+{
+	for (int i = 0; i < tariff.size(); i++)
+	{
+		if (tariff[i] == 32 || (tariff[i] >= 'а' && tariff[i] <= 'я') || (tariff[i] >= 'А' && tariff[i] <= 'Я'))
+			continue;
+
+		return false;
+	}
+	return true;
+}
+
+bool check_presence(bool presence) // функция проверки наличия sim-карты
+{
+	if (presence == 0 || presence == 1)
+		return true;
+	return false;
+}
+
+// функция проверки введенной информации
+void check_sim_information(sim& k)
+{
+	cout << "Введите номер sim-карты (NNN-NNNNNNN, где N это цифра): ";
+	while (1)
+	{
+		cin >> k.sim_number;
+		if (check_sim(k.sim_number))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Номер sim-карты введен некорректно. Повторите ввод: ";
+		}
+	}
+	cout << "Введите тариф: ";
+	while (1)
+	{
+		cin >> k.tariff;
+		if (check_tariff(k.tariff))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Тариф введен неккоректно. Повторите ввод: ";
+		}
+	}
+	cout << "Введите год выпуска sim-карты (число от 2000 до 2021): ";
+	while (1)
+	{
+		cin >> k.year_of_issue;
+		if (check_year_of_issue(k.year_of_issue))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Год выпуска введен некорректно. Повторите ввод: ";
+		}
+	}
+	cout << "Введите наличие sim-карты (0 - нет или 1 - есть): ";
+	while (1)
+	{
+		cin >> k.presence;
+		if (check_presence(k.presence))
+			break;
+		else
+		{
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Наличие введено некорректно. Повторите ввод: ";
+		}
+	}
+}
+
+int hash1(string sim)  // хеш-функция 1
+{
+	int hash1 = 0;
+	for (unsigned int i = 0; i < sim.length(); i++)
+		hash1 += int(sim[i]) * int(sim[i]);
+	return hash1 % TABLE_SIZE;
+}
+
+int hash2(string sim) // хеш-функция 2
+{
+	int hash2 = 0;
+	for (unsigned int i = 0; i < sim.length(); i++)
+		hash2 += int(sim[i]);
+	return (hash2 % 30) + 1;
+}
+
+void print_table(sim* hash_table)  // вывод таблицы
+{
+	for (int i = 0; i < TABLE_SIZE; i++)
+		if (hash_table[i].sim_number != "")
+			cout << i << " " << hash_table[i].sim_number << " " << hash_table[i].tariff << " " << hash_table[i].year_of_issue << " " <<
+			hash_table[i].presence << endl;
+}
+
+void test_hash(int* table) // запись в файл
+{
+	ofstream fout("C:\\Учеба\\2 курс\\2 семестр\\саод\\check_out.txt");
+	if (!fout.is_open())
+		cout << "Ошибка при открытии файла!" << endl;
+	else
+	{
+		for (int i = 0; i < TABLE_SIZE; i++)
+			fout << table[i] << "\n";
+	}
+}
+
+
+void find_sim(sim sim_info, sim* hash_table, bool& result) // поиск элемента по ключу (номеру sim-карты)
+{
+	int pos = hash1(sim_info.sim_number);
+	if (hash_table[pos].sim_number != "" && hash_table[pos].sim_number == sim_info.sim_number)
+	{
+		cout << "sim-карта находится в " << pos << " сегменте" << endl;
+		cout << hash_table[pos].sim_number << " " << hash_table[pos].tariff << " " << hash_table[pos].year_of_issue << " " <<
+			hash_table[pos].presence << endl;
+		result = true;
+	}
+	else
+	{
+		int hash = hash2(sim_info.sim_number);
+		int h = hash;
+		while (h < TABLE_SIZE)
+		{
+			if (hash_table[(pos + h) % TABLE_SIZE].sim_number != "" && hash_table[(pos + h) % TABLE_SIZE].sim_number == sim_info.sim_number)
+			{
+				cout << "Ключ находится в " << (pos + h) % TABLE_SIZE << " сегменте" << endl;
+				result = true;
+				break;
+			}
+			else
+				result = false;
+			h += hash;
+		}
+	}
+	if (!result)
+		cout << "Этого ключа нет в таблице" << endl;
+}
+
+int get_sim_pos(sim sim_info, sim* hash_table) // поиск элемента по ключу (номеру sim-карты)
+{
+	int pos = hash1(sim_info.sim_number);
+	if (hash_table[pos].sim_number != "" && hash_table[pos].sim_number == sim_info.sim_number)
+	{
+		//	cout << "sim-карта находится в " << pos << " сегменте" << endl;
+		return pos;
+	}
+	else
+	{
+		int hash = hash2(sim_info.sim_number);
+		int h = hash;
+		while (h < TABLE_SIZE)
+		{
+			if (hash_table[(pos + h) % TABLE_SIZE].sim_number != "" && hash_table[(pos + h) % TABLE_SIZE].sim_number == sim_info.sim_number)
+			{
+				//	cout << "Ключ находится в " << (pos + h) % TABLE_SIZE << " сегменте" << endl;
+
+				return (pos + h) % TABLE_SIZE;
+				break;
+			}
+			h += hash;
+		}
+	}
+}
+
+void delete_sim(sim sim_info, sim* hash_table) // удаление информации о sim-карте
+{
+	bool result = true;
+	int pos = hash1(sim_info.sim_number);
+	if ((hash_table[pos].sim_number != "" || hash_table[pos].sim_number != "delete") && hash_table[pos].sim_number == sim_info.sim_number)
+	{
+		hash_table[pos].sim_number = "delete";
+		hash_table[pos].tariff = "delete";
+		hash_table[pos].year_of_issue = 0;
+		hash_table[pos].presence = 0;
+	}
+	else
+	{
+		int hash = hash2(sim_info.sim_number);
+		int h = hash;
+		while (h < TABLE_SIZE)
+		{
+			if ((hash_table[(pos + h) % TABLE_SIZE].sim_number != "" || hash_table[(pos + h) % TABLE_SIZE].sim_number != "delete") &&
+				hash_table[(pos + h) % TABLE_SIZE].sim_number == sim_info.sim_number)
+			{
+				hash_table[(pos + h) % TABLE_SIZE].sim_number = "delete";
+				hash_table[(pos + h) % TABLE_SIZE].tariff = "delete";
+				hash_table[(pos + h) % TABLE_SIZE].year_of_issue = 0;
+				hash_table[(pos + h) % TABLE_SIZE].presence = 0;
+				result = true;
+				break;
+			}
+			else
+				result = false;
+			h += hash;
+		}
+	}
+	if (!result)
+		cout << "Данного ключа нет в таблице" << endl;
+}
+
+void push_sim(sim sim_info, sim* hash_table, int* test_table) // добавление ключа (данных о sim-карте)
+{
+	bool result = true;
+	int pos = hash1(sim_info.sim_number);
+	if (hash_table[pos].sim_number == "" || hash_table[pos].sim_number == "delete")
+	{
+		test_table[pos]++;
+	}
+	else
+	{
+		int hash = hash2(sim_info.sim_number);
+		int h = hash;
+		while (hash_table[(pos + h) % TABLE_SIZE].sim_number != "" || h < TABLE_SIZE)
+		{
+			h += hash;
+			pos = (pos + h) % TABLE_SIZE;
+			if (h < TABLE_SIZE)
+			{
+				test_table[pos]++;
+				break;
+			}
+			else
+			{
+				test_table[(pos + h) % TABLE_SIZE]++;
+				result = false;
+			}
+		}
+	}
+	if (result && (hash_table[pos].sim_number == "" || hash_table[pos].sim_number == "delete"))
+	{
+		hash_table[pos] = sim_info;
+		cout << "Ключ успешно добавлен в " << pos << " сегмент" << endl;
+	}
+
+	else
+		cout << "Не удалось добавить ключ" << endl;
+
+}
+
+
+//........................................ 3 часть................................................//
+
+
+struct owner_list
+{
+	string passport; // поле данных
+	string sim_number;
+	string date_register;
+	string date_return;
+	struct owner_list* ptr; // указатель на следующий элемент
+};
+
+owner_list* init(owner_list* lst, string a, sim sim, string c, string d) // а- значение первого узла
+{
+	// struct owner_list* lst;
+	// выделение памяти под корень списка
+//	lst = (struct owner_list*)malloc(sizeof(struct owner_list));
+//	if (lst) {
+	lst->passport = a;
+	lst->sim_number = sim.sim_number;
+	lst->date_register = c;
+	lst->date_return = d;
+	lst->ptr = lst; // указатель на сам корневой узел
+//}
+	return(lst);
+}
+
+owner_list* addelem(owner_list* lst, string a, sim sim, string c, string d)
+{
+	string add_sim_number = sim.sim_number;
+	add_sim_number.erase(add_sim_number.find('-'), 1);
+	int add_sim_number_int = atoi(add_sim_number.c_str());
+
+	owner_list* p;
+	p = lst;
+	do {
+		string temp_sim_number = p->sim_number;
+		temp_sim_number.erase(temp_sim_number.find('-'), 1);
+		int temp_sim_number_int = atoi(temp_sim_number.c_str());
+
+		string temp_sim_number_next = p->ptr->sim_number;
+		temp_sim_number_next.erase(temp_sim_number_next.find('-'), 1);
+		int temp_sim_number_next_int = atoi(temp_sim_number_next.c_str());
+
+		if (add_sim_number_int > temp_sim_number_int && add_sim_number_int < temp_sim_number_next_int) {
+			owner_list* p2;
+			owner_list* temp = new owner_list(); // (struct owner_list*)malloc(sizeof(owner_list));
+			p2 = p->ptr; // сохранение указателя на следующий элемент
+			p->ptr = temp; // предыдущий узел указывает на создаваемый
+			temp->passport = a; // сохранение поля данных добавляемого узла
+			temp->sim_number = sim.sim_number;
+			temp->date_register = c;
+			temp->date_return = d;
+			temp->ptr = p2; // созданный узел указывает на следующий элемент
+			return(temp);
+		}
+
+		/*
+		cout << p->passport << endl;
+		cout << p->sim_number << endl;
+		cout << p->date_register << endl;
+		cout << p->date_return << endl; // вывод значения узла p
+		*/
+		p = p->ptr; // переход к следующему узлу
+	} while (p != lst);
+
+	owner_list* p2;
+	owner_list* temp = new owner_list(); // (struct owner_list*)malloc(sizeof(owner_list));
+	p2 = lst->ptr; // сохранение указателя на следующий элемент
+	lst->ptr = temp; // предыдущий узел указывает на создаваемый
+	temp->passport = a; // сохранение поля данных добавляемого узла
+	temp->sim_number = sim.sim_number;
+	temp->date_register = c;
+	temp->date_return = d;
+	temp->ptr = p2; // созданный узел указывает на следующий элемент
+	return(temp);
+}
+
+owner_list* delete_elem(owner_list* lst)
+{
+	owner_list* temp;
+	temp = lst;
+	while (temp->ptr != lst) // просматриваем список начиная с корня
+	{ // пока не найдем узел, предшествующий lst
+		temp = temp->ptr;
+	}
+	temp->ptr = lst->ptr; // переставляем указатель
+	free(lst); // освобождаем память удаляемого узла
+	return(temp);
+}
+
+void owner_list_print(owner_list* lst)
+{
+	owner_list* p;
+	p = lst;
+	do {
+		cout << "Номер паспорта:" << p->passport << endl;
+		cout << "Номер sim-карты:" << p->sim_number << endl;
+		cout << "Дата регистрации:" << p->date_register << endl;
+		cout <<  p->date_return << endl; // вывод значения узла p
+		p = p->ptr; // переход к следующему узлу
+	} while (p != lst); // условие окончания обхода
+}
+
+void del_owner_list(owner_list* lst, string passport, string sim_number, owner_list*& first_lst)
+{
+	owner_list* p;
+	bool is_delete = false;
+	p = lst;
+	do {
+		if (p->passport == passport && p->sim_number == sim_number) {
+			if (first_lst->passport == passport && first_lst->sim_number == sim_number) {
+				first_lst = p->ptr;
+			}
+			delete_elem(p);
+			is_delete = true;
+			break;
+		}
+		p = p->ptr; // переход к следующему узлу
+	} while (p != lst); // условие окончания обхода
+	if (!is_delete) {
+		cout << "Данный паспотр не привязан к сим-карте!" << endl;
+	}
+}
+
+
+int main()
+{
+	SetConsoleOutputCP(1251);
+	SetConsoleCP(1251);
+	Node* root = NULL; // указатель на корень
+	int chose; // выбор пункта меню
+
+	srand(static_cast<unsigned int>(time(0)));
+	int test_table[TABLE_SIZE] = { -1 };
+	sim hash_table[TABLE_SIZE];
+
+	owner_list* owner_lst = new owner_list();
+	owner_list* first_owner_lst = new owner_list();
+	int owner_list_count = 0;
+
+	while (1)
+	{
+		system("cls");
+		cout << endl;
+		cout << "Выберите дальнейшие действия:" << endl;
+		cout << "1-вывести дерево на экран и список прямым обходом" << endl;
+		cout << "2-добавить нового клиента" << endl;
+		cout << "3-снять клиента с обслуживания" << endl;
+		cout << "4-поиск клиента по номеру паспорта" << endl;
+		cout << "5-поиск клиента по части ФИО" << endl;
+
+		cout << "6 - выведение таблицы данных о sim-картах на экран" << endl;
+		cout << "7 - найти элемент по номеру sim-карты" << endl;
+		cout << "8 - найти элемент по названию тарифа" << endl;
+		cout << "9 - удаление сведений о sim-карте из таблицы" << endl;
+		cout << "10 - добавление sim-карты" << endl;
+		cout << "11 - запись в файл" << endl;
+
+		cout << "12 - регистрация выдачи sim-карты клиенту" << endl;
+		cout << "13 - возврат sim-карты клиентом" << endl;
+		cout << "14 - вывод выданных sim-карт" << endl;
+		cout << "0-выход из программы" << endl;
+		cin >> chose;
+		switch (chose)
+		{
+		case 1:
+		{
+			system("cls");
+			cout << endl << endl;
+			print_tree(root, 0);
+			cout << endl << endl;
+			print_information(root);
+			system("pause");
+			break;
+		}
+		case 2:
+		{
+			system("cls");
+			cout << endl << endl;
+			bool found = false;
+			client k;
+			check_information(k);
+			check_client(root, k, found);
+			if (found)
+				cout << "Уже есть в дереве" << endl;
+			else
+			{
+				string pas = k.passport;
+				pas.erase(pas.find('-'), 1);
+				pas.erase(0, 4);
+				int res = stoi(pas);
+				root = add_client(root, k, res);
+				cout << "Элемент успешно добавлен" << endl;
+			}
+			found = false;
+			system("pause");
+			break;
+		}
+		case 3:
+		{
+			system("cls");
+			cout << endl << endl;
+			bool found = false;
+			client k;
+			cout << "Введите номер паспорта клиента, снимаемого с обслуживания: ";
+			cin >> k.passport;
+			check_client(root, k, found);
+			if (found)
+			{
+				cout << "Есть в дереве" << endl;
+				string pas = k.passport;
+				pas.erase(pas.find('-'), 1);
+				pas.erase(0, 4);
+				int res = stoi(pas);
+				root = deleteElem(root, res);
+				cout << "Клиент удален" << endl;
+			}
+			else
+			{
+				cout << "Клиент не найден" << endl;
+			}
+			found = false;
+			system("pause");
+			break;
+		}
+
+		case 4:
+		{
+			//поиск клиента
+			system("cls");
+			cout << endl << endl;
+			bool found = false;
+			client k;
+			cout << "Введите номер паспорта для поиска клиента:";
+			cin >> k.passport;
+			check_client(root, k, found); // с серией
+			if (found)
+			{
+				cout << "Есть в дереве" << endl;
+				search_client(root, k, found);
+			}
+			else
+			{
+				cout << "Клиент не найден" << endl;
+			}
+			found = false;
+			system("pause");
+			break;
+		}
+
+		case 5:
+		{
+			//поиск клиента
+			system("cls");
+			cout << endl << endl;
+			string fio_part;
+			cout << "Введите часть ФИО для поиска клиента:";
+			cin >> fio_part;
+			search_client_by_fio(root, fio_part);
+			system("pause");
+			break;
+		}
+
+		case 6:
+		{
+			print_table(hash_table);
+			system("pause");
+			break;
+		}
+		case 7:
+		{
+			sim k;
+			cout << "Введите номер sim-карты (NNN-NNNNNNN, где N это цифра): ";
+			while (1)
+			{
+				cin >> k.sim_number;
+				if (check_sim(k.sim_number))
+					break;
+				else
+				{
+					cin.clear();
+					cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+					cout << "Номер sim-карты введен некорректно. Повторите ввод: ";
+				}
+			}
+			bool result = false;
+			find_sim(k, hash_table, result);
+			system("pause");
+			break;
+		}
+		case 8:
+		{
+			cout << "Введите тариф: ";
+			sim k;
+			while (1)
+			{
+				cin >> k.tariff;
+				if (check_tariff(k.tariff))
+					break;
+				else
+				{
+					cin.clear();
+					cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+					cout << "Тариф введен неккоректно. Повторите ввод: ";
+				}
+			}
+
+			for (int i = 0; i < TABLE_SIZE; i++)
+			{
+				if (hash_table[i].tariff == k.tariff)
+					cout << i << " " << hash_table[i].sim_number << " " << hash_table[i].tariff << " " << hash_table[i].year_of_issue << endl;
+			}
+			system("pause");
+			break;
+		}
+
+		case 9:
+		{
+			sim k;
+			cout << "Введите номер sim-карты (NNN-NNNNNNN, где N это цифра): ";
+			while (1)
+			{
+				cin >> k.sim_number;
+				if (check_sim(k.sim_number))
+					break;
+				else
+				{
+					cin.clear();
+					cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+					cout << "Номер sim-карты введен некорректно. Повторите ввод: ";
+				}
+			}
+			delete_sim(k, hash_table);
+			system("pause");
+			break;
+		}
+		case 10:
+		{
+			sim sim;
+			check_sim_information(sim);
+			push_sim(sim, hash_table, test_table);
+			system("pause");
+			break;
+		}
+		case 11:
+		{
+			test_hash(test_table);
+			system("pause");
+			break;
+		}
+		case 12:
+		{
+			cout << endl << endl;
+			bool found = false;
+			client k;
+			while (!found) {
+				cout << "Введите номер паспорта для поиска клиента:";
+				cin >> k.passport;
+				check_client(root, k, found); // с серией
+
+				if (found)
+				{
+					cout << "Клиент есть в базе" << endl;
+				}
+				else
+				{
+					cout << "Клиент не найден" << endl;
+				}
+			}
+
+			bool is_find_sim = false;
+			sim c;
+			while (!is_find_sim) {
+				cout << "Введите номер sim-карты (NNN-NNNNNNN, где N это цифра): ";
+				while (1)
+				{
+					cin >> c.sim_number;
+					if (check_sim(c.sim_number))
+						break;
+					else
+					{
+						cin.clear();
+						cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+						cout << "Номер sim-карты введен некорректно. Повторите ввод: ";
+					}
+				}
+				find_sim(c, hash_table, is_find_sim);
+			}
+
+			cout << "Дата регистрации: " << endl;
+			time_t now = time(NULL);
+			tm* ptr = localtime(&now);
+			int day = ptr->tm_mday;
+			int month = 1 + ptr->tm_mon;
+			int year = 1900 + ptr->tm_year;
+			string day_str = to_string(day / 10) + to_string(day % 10);
+			string month_str = to_string(month / 10) + to_string(month % 10);
+			string year_str = to_string(year);
+			string current_date = day_str + '.' + month_str + '.' + year_str;
+			cout << current_date << endl;
+
+			int currentSimPos = get_sim_pos(c, hash_table);
+			if (hash_table[currentSimPos].presence == 0) {
+				cout << "Данная сим-карата уже выдана!" << endl;
+				system("pause");
+				break;
+			}
+
+			if (owner_list_count == 0) {
+				owner_lst = init(owner_lst, k.passport, hash_table[currentSimPos], current_date, "");
+				first_owner_lst = owner_lst;
+				hash_table[currentSimPos].presence = 0;
+				owner_list_count++;
+			}
+			else {
+				owner_lst = addelem(first_owner_lst, k.passport, hash_table[currentSimPos], current_date, "");
+				hash_table[currentSimPos].presence = 0;
+				owner_list_count++;
+			}
+
+			system("pause");
+			break;
+		}
+		case 13:
+		{
+			cout << endl << endl;
+			bool found = false;
+			client k;
+			while (!found) {
+				cout << "Введите номер паспорта для поиска клиента:";
+				cin >> k.passport;
+				check_client(root, k, found); // с серией
+
+				if (found)
+				{
+					cout << "Клиент есть в базе" << endl;
+				}
+				else
+				{
+					cout << "Клиент не найден" << endl;
+				}
+			}
+
+			bool is_find_sim = false;
+			sim c;
+			while (!is_find_sim) {
+				cout << "Введите номер sim-карты (NNN-NNNNNNN, где N это цифра): ";
+				while (1)
+				{
+					cin >> c.sim_number;
+					if (check_sim(c.sim_number))
+						break;
+					else
+					{
+						cin.clear();
+						cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+						cout << "Номер sim-карты введен некорректно. Повторите ввод: ";
+					}
+				}
+				find_sim(c, hash_table, is_find_sim);
+			}
+
+			int currentSimPos = get_sim_pos(c, hash_table);
+			if (hash_table[currentSimPos].presence == 1) {
+				cout << "Данная сим-карта уже возвращена!" << endl;
+				system("pause");
+				break;
+			}
+
+			del_owner_list(owner_lst, k.passport, c.sim_number, first_owner_lst);
+			hash_table[currentSimPos].presence = 1;
+			owner_list_count--;
+
+			cout << "Дата возврата: " << endl;
+			time_t now = time(NULL);
+			tm* ptr = localtime(&now);
+			int day = ptr->tm_mday;
+			int month = 1 + ptr->tm_mon;
+			int year = 1900 + ptr->tm_year;
+			string day_str = to_string(day / 10) + to_string(day % 10);
+			string month_str = to_string(month / 10) + to_string(month % 10);
+			string year_str = to_string(year);
+			string current_date = day_str + '.' + month_str + '.' + year_str;
+			cout << current_date << endl;
+
+			system("pause");
+			break;
+		}
+		case 14:
+		{
+			if (owner_list_count > 0) {
+				owner_list_print(first_owner_lst);
+			}
+			else {
+				cout << "Пусто!" << endl;
+			}
+			system("pause");
+			break;
+		}
+
+		case 0:
+		{
+			return 0;
+		}
+		}
+	}
+}
